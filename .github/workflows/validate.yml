@@ -1,0 +1,51 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate marketplace and plugin manifests
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate .
+          for plugin in plugins/*/; do
+            claude plugin validate "$plugin"
+          done
+
+      - name: Check skill frontmatter
+        run: |
+          status=0
+          for skill in plugins/*/skills/*/SKILL.md; do
+            dir="$(basename "$(dirname "$skill")")"
+            name="$(sed -n '2,/^---$/s/^name: *//p' "$skill")"
+            desc="$(sed -n '2,/^---$/s/^description: *//p' "$skill")"
+            if [ "$(head -1 "$skill")" != "---" ]; then echo "::error file=$skill::missing frontmatter"; status=1; fi
+            if [ "$name" != "$dir" ]; then echo "::error file=$skill::name '$name' must match folder '$dir'"; status=1; fi
+            if ! [[ "$name" =~ ^[a-z0-9-]{1,64}$ ]]; then echo "::error file=$skill::name must be lowercase letters, digits, hyphens (max 64)"; status=1; fi
+            if [ -z "$desc" ] || [ "${#desc}" -gt 1024 ]; then echo "::error file=$skill::description must be 1-1024 characters"; status=1; fi
+          done
+          exit $status
+
+      - name: Check dist/ zips are up to date
+        run: |
+          cp -R dist "$RUNNER_TEMP/committed"
+          ./scripts/package.sh
+          rm -rf "$RUNNER_TEMP/a" "$RUNNER_TEMP/b"
+          for zip in $(cd dist && find . -name '*.zip') $(cd "$RUNNER_TEMP/committed" && find . -name '*.zip'); do
+            [ -f "dist/$zip" ] && [ -f "$RUNNER_TEMP/committed/$zip" ] || { echo "::error::dist/$zip is missing or stale; run scripts/package.sh and commit dist/"; exit 1; }
+            mkdir -p "$RUNNER_TEMP/a/$zip" "$RUNNER_TEMP/b/$zip"
+            unzip -qo "dist/$zip" -d "$RUNNER_TEMP/a/$zip"
+            unzip -qo "$RUNNER_TEMP/committed/$zip" -d "$RUNNER_TEMP/b/$zip"
+          done
+          diff -r "$RUNNER_TEMP/a" "$RUNNER_TEMP/b" || { echo "::error::dist/ is stale; run scripts/package.sh and commit dist/"; exit 1; }

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mndrake-plugins",
+  "owner": {
+    "name": "mndrake"
+  },
+  "metadata": {
+    "description": "Plugins and skills for Claude Code, Claude Cowork, and Claude chat.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "eli5",
+      "source": "./plugins/eli5",
+      "description": "Explain any topic like I'm 5: a dead-simple HTML picture explainer with big visuals and few words. Use /eli5 <topic>.",
+      "version": "1.1.0",
+      "author": {
+        "name": "Thariq Shihipar"
+      },
+      "license": "MIT",
+      "category": "learning",
+      "keywords": ["explain", "eli5", "learning", "explainer", "html"]
+    }
+  ]
+}
